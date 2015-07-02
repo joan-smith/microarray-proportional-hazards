@@ -61,11 +61,11 @@ def import_file(name):
   gene_names = cohort[:,0][3:]
   patient_value = cohort[3:, 1:]
 
-  for i in patient_value:
-    for j in range(len(i)):
-      if i[j] == '':
+  for i, row in enumerate(patient_value):
+    for j in range(len(row)):
+      if row[j] == '' or row[j] == np.nan:
         print 'warning: blank found at row ', i, ' col ', j
-        i[j] = np.nan
+        row[j] = np.nan
 
   patient_value = patient_value.astype(np.float)
   return (survival_time, survival_censor, gene_names, patient_value)
