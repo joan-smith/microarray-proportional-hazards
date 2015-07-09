@@ -38,7 +38,7 @@ rpy2.robjects.numpy2ri.activate()
 help_message = '''This tool allows calculation of Cox Proportional Hazard Z scores and P values for cleaned data files provided
     Usage:
        ./zscores.py -i <input file> -o <output directory>
-          --multivariate <feature_name>,<feature_name>|all
+          -m <feature_name>,<feature_name>|all
 
     Input file must be provided clean and normalized, though blank data is acceptable.
 
