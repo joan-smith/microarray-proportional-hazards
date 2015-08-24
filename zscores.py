@@ -221,31 +221,35 @@ def write_file_with_results(input_file_name, results, outfile_location):
 
 def do_files(files, outdir, multivariates=[]):
   for f in files:
-    survival_time, survival_censor, gene_names, patient_values, feature_names, features =  import_file(f)
+    try:
+      survival_time, survival_censor, gene_names, patient_values, feature_names, features =  import_file(f)
 
-    # select the requested features
-    features_for_calculation = []
-    feature_names_for_calculation = []
-    for variable in multivariates:
-      safe_feature_name = safe_string(variable)
-      if safe_feature_name == 'all':
-        if len(multivariates) == 1:
-          features_for_calculation = features
-        else:
-          print 'Error: All features requested for multivariate calculation, but additional provided, ' + ', '.join(multivariates)
+      # select the requested features
+      features_for_calculation = []
+      feature_names_for_calculation = []
+      for variable in multivariates:
+        safe_feature_name = safe_string(variable)
+        if safe_feature_name == 'all':
+          if len(multivariates) == 1:
+            features_for_calculation = features
+          else:
+            print 'Error: All features requested for multivariate calculation, but additional provided, ' + ', '.join(multivariates)
+            sys.exit(2)
+        if not safe_feature_name in feature_names:
+          print 'Error: Requested multivariate ' + safe_feature_name + ' not found in given features, ' + ', '.join(features)
           sys.exit(2)
-      if not safe_feature_name in feature_names:
-        print 'Error: Requested multivariate ' + safe_feature_name + ' not found in given features, ' + ', '.join(features)
-        sys.exit(2)
-      else:
-        feature_idx = feature_names.index(safe_feature_name)
-        feature_names_for_calculation.append(safe_feature_name)
-        features_for_calculation.append(features[feature_idx])
+        else:
+          feature_idx = feature_names.index(safe_feature_name)
+          feature_names_for_calculation.append(safe_feature_name)
+          features_for_calculation.append(features[feature_idx])
 
-    results = []
-    for i in range(len(patient_values)):
-      results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names_for_calculation, features_for_calculation))
-    write_file_with_results(f, results, outdir)
+      results = []
+      for i in range(len(patient_values)):
+        results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names_for_calculation, features_for_calculation))
+    except Exception as e:
+      print "Something went wrong"
+    finally:
+      write_file_with_results(f, results, outdir)
 
 def main(argv=None):
   if argv is None:
@@ -273,13 +277,18 @@ def main(argv=None):
         multivariates = value.split(',')
 
     if ('--interactive', '') in opts:
-      survival_time, survival_censor, gene_names, patient_values, feature_names, features =  import_file_interactive(infile)
-      results = []
-      for i in range(len(patient_values)):
-        results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names, features))
-        print results[-1]
-      write_file_with_results(infile, results, outdir)
-      exit(0)
+      try:
+        survival_time, survival_censor, gene_names, patient_values, feature_names, features =  import_file_interactive(infile)
+        results = []
+        for i in range(len(patient_values)):
+          results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names, features))
+          print results[-1]
+      except Exception as e:
+        print "Something went wrong, ", e
+      finally:
+        print "Saving file..."
+        write_file_with_results(infile, results, outdir)
+        exit(0)
 
     if not infile:
       usage()
