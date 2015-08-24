@@ -163,7 +163,7 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
   expn_value = np.delete(expn_value, skip_cols)
   surv_time = np.delete(surv_time, skip_cols)
   surv_censor = np.delete(surv_censor, skip_cols)
-  if len(feature_names) > 1:
+  if len(feature_names) >= 1:
     features = np.delete(features, skip_cols, 1)
 
   if len(expn_value) < 10:
@@ -176,13 +176,15 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
     float_features = features[idx].astype(np.float)
     r.assign(feature_name, float_features)
   formula_string = ''
-  if len(feature_names) > 1:
+  if len(feature_names) >= 1:
     formula_string = 'gene + ' + ' + '.join(feature_names)
+    data_frame_string = 'gene, '+ ', '.join(feature_names)
   else:
     formula_string = 'gene'
+    data_frame_string = 'gene'
 
   r.assign('gene', expn_value)
-  r('data = data.frame(gene, '+ ', '.join(feature_names) + ')' )
+  r('data = data.frame(' + data_frame_string + ')')
   coxuh_output = r('summary( coxph(formula = Surv(time, censor) ~ ' + formula_string + ', ' +
     'data = data, model=FALSE, x=FALSE, y=FALSE))')
 
@@ -195,8 +197,8 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
       'z': coeffs.rx(multivariate, 'z')[0],
       'p': coeffs.rx(multivariate, 'Pr(>|z|)')[0]
     }
-  return cox_dict
 
+  return cox_dict
 
 def write_file_with_results(input_file_name, results, outfile_location):
   input_file_name_slug = os.path.basename(input_file_name).split('.')[0]
@@ -282,7 +284,6 @@ def main(argv=None):
         results = []
         for i in range(len(patient_values)):
           results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names, features))
-          print results[-1]
       except Exception as e:
         print "Something went wrong, ", e
       finally:
