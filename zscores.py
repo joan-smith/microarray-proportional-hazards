@@ -137,14 +137,12 @@ def import_file(name, time_row=0, censor_row=1, features_rows=None):
     for j in range(len(feature)):
       if feature[j] == '':
         feature[j] = np.nan
-        print 'warning: blank found at row ', i, ' col ', j
 
   gene_names = row_headers[patient_row_idx+1:]
   patient_value = cohort[patient_row_idx+1:, 1:]
   for i, row in enumerate(patient_value):
     for j in range(len(row)):
       if row[j] == '' or row[j] == np.nan:
-        print 'warning: blank found at row ', i, ' col ', j
         row[j] = np.nan
 
   patient_value = patient_value.astype(np.float)
@@ -281,6 +279,7 @@ def main(argv=None):
     if ('--interactive', '') in opts:
       try:
         survival_time, survival_censor, gene_names, patient_values, feature_names, features =  import_file_interactive(infile)
+        print "File Imported Successfully, calculating survival..."
         results = []
         for i in range(len(patient_values)):
           results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names, features))
