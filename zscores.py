@@ -256,7 +256,6 @@ def main(argv=None):
     argv = sys.argv
     try:
       opts, args = getopt.getopt(argv[1:], 'ho:i:vm:',
-      ['help', 'input=', 'output=', 'multivariates='])
       ['help', 'input=', 'output=', 'multivariates=', 'interactive'])
     except getopt.error, msg:
       usage()
