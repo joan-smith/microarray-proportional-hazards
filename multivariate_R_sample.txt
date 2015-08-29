@@ -1,0 +1,26 @@
+library(survival)
+
+data <- read.csv('test_data/GSE53752.csv', header=FALSE)
+time <- data[1,]
+time[1] <- NULL
+time <- as.numeric(as.array(as.matrix(time)))
+
+censor <- data[2,]
+censor[[1]] <- NULL
+censor <- as.numeric(as.array(as.matrix(censor)))
+
+gene2 <- data[10,]
+gene2[[1]] <- NULL
+gene2 <- as.numeric(as.array(as.matrix(gene2)))
+
+grade <- data[5,]
+grade[[1]] <- NULL
+grade <- as.numeric(as.array(as.matrix(grade)))
+
+mitotic <- data[6,]
+mitotic[[1]] <- NULL
+mitotic <- as.numeric(as.array(as.matrix(mitotic)))
+
+coxdata <- data.frame(gene, time, censor, grade, mitotic)
+
+coxph(formula = Surv(time, censor) ~ gene2 + grade + mitotic, data = coxdata, model=FALSE, x=FALSE, y=FALSE, singular.ok=TRUE)

@@ -39,10 +39,12 @@ help_message = '''This tool allows calculation of Cox Proportional Hazard Z scor
     Usage:
        ./zscores.py -i <input file> -o <output directory>
           -m <feature_name>,<feature_name>|all
+          --interactive
 
     Input file must be provided clean and normalized, though blank data is acceptable.
 
     Format: a csv file with Unix line endings, each column is a single patient
+    In interactive mode, all fields except ID_REF are optional
       rows:
         1. time: first column is an ignored name, all following columns are
              patient survival times
@@ -64,10 +66,58 @@ def safe_string(string):
   safe_string = "".join([c for c in string if re.match(r'\w', c)])
   return safe_string
 
-def import_file(name):
+def print_row_selection(row_titles):
+  for i, title in enumerate(row_titles):
+    print str(i+1) + '. ' + title
+
+def row_selection(row_selection, row_titles, exit_on_invalid = True):
+  try:
+    row_selection_int = int(row_selection) - 1
+    if row_selection_int >= len(row_titles):
+      print 'Error: Invalid Selection'
+      if exit_on_invalid:
+        exit(1)
+      return None
+    return row_selection_int
+  except(ValueError):
+    print 'Error: Invalid Selection'
+    if exit_on_invalid:
+      exit(1)
+    return None
+
+def import_file_interactive(name):
+  with open(name) as f:
+    row_titles = []
+    for line in f.readlines():
+      row_title = line.split(',')[0]
+      if row_title == 'patient':
+        break
+      else:
+        row_titles.append(row_title)
+
+    print_row_selection(row_titles)
+    time_row_number_selection = raw_input('Enter number for row that has survival time: ')
+    time_row_number = row_selection(time_row_number_selection, row_titles)
+
+    print_row_selection(row_titles)
+    censor_row_number_selection = raw_input('Enter number for row that has censor: ')
+    censor_row_number = row_selection(censor_row_number_selection, row_titles)
+
+    additional_variables_rows = []
+    while True:
+      print_row_selection(row_titles)
+      selection = raw_input('Enter number for row with additional value, or "END" to finish selection: ')
+      if selection == 'END':
+        break
+      else:
+        additional_variables_rows.append(row_selection(selection, row_titles, exit_on_invalid=False))
+    additional_variables_rows = [x for x in additional_variables_rows if x != None]
+    return import_file(name, time_row_number, censor_row_number, features_rows=additional_variables_rows)
+
+def import_file(name, time_row=0, censor_row=1, features_rows=None):
   cohort = np.genfromtxt(name, delimiter=',', dtype=None, filling_values='')
-  survival_time = [np.float(c) for c in cohort[0][1:] if len(c) > 0]
-  survival_censor = [np.int(c) for c in cohort[1][1:] if len(c) > 0]
+  survival_time = [np.float(c) for c in cohort[time_row][1:] if len(c) > 0]
+  survival_censor = [np.int(c) for c in cohort[censor_row][1:] if len(c) > 0]
   row_headers = list(cohort[:,0])
 
   if 'patient' in row_headers:
@@ -76,15 +126,23 @@ def import_file(name):
     print 'Error: \'patient\' header not found'
     usage()
 
-  feature_names = [safe_string(name) for name in cohort[2:patient_row_idx,0]]
-  features = cohort[2:patient_row_idx,1:]
-  gene_names = row_headers[patient_row_idx+1:]
+  if features_rows == None:
+    feature_names = [safe_string(name) for name in cohort[2:patient_row_idx,0]]
+    features = cohort[2:patient_row_idx,1:]
+  else:
+    feature_names = [safe_string(name) for name in cohort[features_rows, 0]]
+    features = cohort[features_rows,1:]
 
+  for i, feature in enumerate(features):
+    for j in range(len(feature)):
+      if feature[j] == '':
+        feature[j] = np.nan
+
+  gene_names = row_headers[patient_row_idx+1:]
   patient_value = cohort[patient_row_idx+1:, 1:]
   for i, row in enumerate(patient_value):
     for j in range(len(row)):
       if row[j] == '' or row[j] == np.nan:
-        print 'warning: blank found at row ', i, ' col ', j
         row[j] = np.nan
 
   patient_value = patient_value.astype(np.float)
@@ -99,10 +157,11 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
   for i in range(len(expn_value)):
     if np.isnan(expn_value[i]):
       skip_cols.append(i)
+
   expn_value = np.delete(expn_value, skip_cols)
   surv_time = np.delete(surv_time, skip_cols)
   surv_censor = np.delete(surv_censor, skip_cols)
-  if len(feature_names) > 1:
+  if len(feature_names) >= 1:
     features = np.delete(features, skip_cols, 1)
 
   if len(expn_value) < 10:
@@ -113,15 +172,17 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
   r.assign('censor', surv_censor)
   for idx, feature_name in enumerate(feature_names):
     float_features = features[idx].astype(np.float)
-    r.assign(feature_name, features[idx])
+    r.assign(feature_name, float_features)
   formula_string = ''
-  if len(feature_names) > 1:
-    formula_string = 'gene' + ' + '.join(feature_names)
+  if len(feature_names) >= 1:
+    formula_string = 'gene + ' + ' + '.join(feature_names)
+    data_frame_string = 'gene, '+ ', '.join(feature_names)
   else:
     formula_string = 'gene'
+    data_frame_string = 'gene'
 
   r.assign('gene', expn_value)
-  r('data = data.frame(gene)')
+  r('data = data.frame(' + data_frame_string + ')')
   coxuh_output = r('summary( coxph(formula = Surv(time, censor) ~ ' + formula_string + ', ' +
     'data = data, model=FALSE, x=FALSE, y=FALSE))')
 
@@ -134,8 +195,8 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
       'z': coeffs.rx(multivariate, 'z')[0],
       'p': coeffs.rx(multivariate, 'Pr(>|z|)')[0]
     }
-  return cox_dict
 
+  return cox_dict
 
 def write_file_with_results(input_file_name, results, outfile_location):
   input_file_name_slug = os.path.basename(input_file_name).split('.')[0]
@@ -160,31 +221,35 @@ def write_file_with_results(input_file_name, results, outfile_location):
 
 def do_files(files, outdir, multivariates=[]):
   for f in files:
-    survival_time, survival_censor, gene_names, patient_values, feature_names, features =  import_file(f)
+    try:
+      survival_time, survival_censor, gene_names, patient_values, feature_names, features =  import_file(f)
 
-    # select the requested features
-    features_for_calculation = []
-    feature_names_for_calculation = []
-    for variable in multivariates:
-      safe_feature_name = safe_string(variable)
-      if safe_feature_name == 'all':
-        if len(multivariates) == 1:
-          features_for_calculation = features
-        else:
-          print 'Error: All features requested for multivariate calculation, but additional provided, ' + ', '.join(multivariates)
+      # select the requested features
+      features_for_calculation = []
+      feature_names_for_calculation = []
+      for variable in multivariates:
+        safe_feature_name = safe_string(variable)
+        if safe_feature_name == 'all':
+          if len(multivariates) == 1:
+            features_for_calculation = features
+          else:
+            print 'Error: All features requested for multivariate calculation, but additional provided, ' + ', '.join(multivariates)
+            sys.exit(2)
+        if not safe_feature_name in feature_names:
+          print 'Error: Requested multivariate ' + safe_feature_name + ' not found in given features, ' + ', '.join(features)
           sys.exit(2)
-      if not safe_feature_name in feature_names:
-        print 'Error: Requested multivariate ' + safe_feature_name + ' not found in given features, ' + ', '.join(features)
-        sys.exit(2)
-      else:
-        feature_idx = feature_names.index(safe_feature_name)
-        feature_names_for_calculation.append(safe_feature_name)
-        features_for_calculation.append(features[feature_idx])
+        else:
+          feature_idx = feature_names.index(safe_feature_name)
+          feature_names_for_calculation.append(safe_feature_name)
+          features_for_calculation.append(features[feature_idx])
 
-    results = []
-    for i in range(len(patient_values)):
-      results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names_for_calculation, features_for_calculation))
-    write_file_with_results(f, results, outdir)
+      results = []
+      for i in range(len(patient_values)):
+        results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names_for_calculation, features_for_calculation))
+    except Exception as e:
+      print "Something went wrong"
+    finally:
+      write_file_with_results(f, results, outdir)
 
 def main(argv=None):
   if argv is None:
@@ -192,6 +257,7 @@ def main(argv=None):
     try:
       opts, args = getopt.getopt(argv[1:], 'ho:i:vm:',
       ['help', 'input=', 'output=', 'multivariates='])
+      ['help', 'input=', 'output=', 'multivariates=', 'interactive'])
     except getopt.error, msg:
       usage()
 
@@ -209,6 +275,20 @@ def main(argv=None):
         outdir = value
       if option in ('-m', '--mutlivariates'):
         multivariates = value.split(',')
+
+    if ('--interactive', '') in opts:
+      try:
+        survival_time, survival_censor, gene_names, patient_values, feature_names, features =  import_file_interactive(infile)
+        print "File Imported Successfully, calculating survival..."
+        results = []
+        for i in range(len(patient_values)):
+          results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names, features))
+      except Exception as e:
+        print "Something went wrong, ", e
+      finally:
+        print "Saving file..."
+        write_file_with_results(infile, results, outdir)
+        exit(0)
 
     if not infile:
       usage()
