@@ -1,4 +1,5 @@
 import sys
+import help_message
 
 def print_row_selection(row_titles):
   for i, title in enumerate(row_titles):
@@ -39,12 +40,17 @@ def repeating_row_selection(message, row_titles):
   return selections
 
 def get_row_titles(name):
-  with open(name) as f:
+  with open(name, 'rU') as f:
     row_titles = []
-    for line in f.readlines():
+    for i,line in enumerate(f.readlines()):
       row_title = line.split(',')[0]
-      if row_title == 'patient':
+      if row_title[0] == '!':
+        continue
+      if row_title == 'patient' or row_title == 'ID_REF':
         break
+      elif i > 50:
+        print "'patient' nor 'ID_REF' found. Aborting."
+        help_message.usage()
       else:
         row_titles.append(row_title)
   return row_titles
