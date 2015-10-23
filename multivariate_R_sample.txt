@@ -11,7 +11,7 @@ censor <- as.numeric(as.array(as.matrix(censor)))
 
 gene2 <- data[10,]
 gene2[[1]] <- NULL
-gene2 <- as.numeric(as.array(as.matrix(gene2)))
+gene2 <- as.numeric(as.array(as.matrix(gene)))
 
 grade <- data[5,]
 grade[[1]] <- NULL

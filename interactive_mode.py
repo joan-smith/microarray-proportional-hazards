@@ -1,4 +1,5 @@
 import sys
+import numpy as np
 
 def print_row_selection(row_titles):
   for i, title in enumerate(row_titles):
@@ -24,10 +25,11 @@ def row_selection(message, row_titles, exit_on_invalid = True):
     exit(1)
   return row_selection
 
-def repeating_row_selection(message, row_titles):
+def repeating_row_num_selection(message, row_titles):
   selections = []
   while True:
     print_row_selection(row_titles)
+
     selection = raw_input(message)
     if selection == 'END':
       break
@@ -35,6 +37,28 @@ def repeating_row_selection(message, row_titles):
       row_selection = convert_single_row_selection(selection, row_titles)
       if row_selection == None:
         continue
+      selections.append(row_selection)
+  return selections
+
+def str_row_selection(selection_str, row_titles):
+  if row_titles.count(selection_str) == 1:
+    return row_titles.index(selection_str)
+
+def repeating_string_row_selection(message, row_title_fn):
+  selections = []
+  row_titles = None
+
+  while True:
+    selection = raw_input(message)
+    if selection == 'END':
+      break
+    else:
+      if row_titles == None:
+        row_titles = row_title_fn()
+      row_selection = str_row_selection(selection, row_titles)
+      if row_selection == None:
+        continue
+      print row_selection
       selections.append(row_selection)
   return selections
 
@@ -55,21 +79,11 @@ def import_file_interactive(name):
     time_row_number = row_selection('Enter number for row that has survival time: ', row_titles)
     censor_row_number = row_selection('Enter number for row that has censor: ',row_titles)
 
-    additional_variables_rows = []
-    additional_variables_rows = repeating_row_selection('Enter a number for an additional variable, "END" to finish selection: ', row_titles)
+    additional_variables_rows = repeating_row_num_selection('Enter a number for an additional variable, "END" to finish selection: ', row_titles)
 
-    #TODO(joans): 8/30 actually make this work
-    gene_rows = []
-    gene_names = None
-    print 'Next you\'ll make gene selections. Note, after the first selection the gene names will be loaded'
-    while True:
-      selection = raw_input('Enter the name of a gene to use in multivariate analysis, "END" to finish selection: ')
-      if selection == 'END':
-        break
-      else:
-        if not gene_names:
-          gene_names = np.genfromtxt(file_name, use_cols=0, delimiter=',', dtype=None, filling_values='')
-        gene_rows.append(row_selection(selection, gene_names, exit_on_invalid=False))
-    ####
+    print 'Next you can make gene selections. Note, after the first selection the gene names will be loaded'
+    get_gene_rows = lambda: list(np.genfromtxt(name, usecols=0, delimiter=',', dtype=None, filling_values=''))
+    gene_rows = repeating_string_row_selection('Enter a gene, "END" to finish selection: ', get_gene_rows)
+    print gene_rows
 
     return name, time_row_number, censor_row_number, additional_variables_rows
