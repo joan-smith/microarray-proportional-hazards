@@ -219,7 +219,7 @@ def do_files(files, outdir, multivariates=[]):
 def get_options(argv):
   try:
     opts, args = getopt.getopt(argv[1:], 'ho:i:vm:',
-    ['help', 'input=', 'output=', 'multivariates=', 'interactive'])
+    ['help', 'input=', 'output-directory=', 'multivariates=', 'interactive'])
   except getopt.error, msg:
     help_message.usage()
 
@@ -255,7 +255,7 @@ def main(argv=None):
       # so move them.
       input_data['features'] = input_data['all_features']
       input_data['feature_names'] = input_data['all_feature_names']
-      do_one_file(infile, input_data)
+      do_one_file(infile, input_data, outdir)
       sys.exit(0);
     else:
       do_files([infile], outdir, multivariates)
