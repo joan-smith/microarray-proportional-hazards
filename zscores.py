@@ -49,6 +49,9 @@ def clear_blanks(rows):
         row[j] = np.nan
   return rows
 
+def get_feature_row_names(patient_row_idx, cohort):
+  return [safe_string(name) for name in cohort[0:patient_row_idx,0]]
+
 def get_features(features_rows, patient_row_idx, cohort):
   if features_rows == None:
     feature_names = [safe_string(name) for name in cohort[2:patient_row_idx,0]]
@@ -89,6 +92,7 @@ def import_file(name, time_row=0, censor_row=1, features_rows=None):
     help_message.usage()
 
   features, feature_names = get_features(features_rows, patient_row_idx, cohort)
+  all_metadata_row_names = get_feature_row_names(patient_row_idx, cohort)
 
   gene_names = row_headers[patient_row_idx+1:]
   patient_value = cohort[patient_row_idx+1:, 1:]
@@ -99,6 +103,9 @@ def import_file(name, time_row=0, censor_row=1, features_rows=None):
       'patient_values': patient_value,
       'survival_time': survival_time,
       'survival_censor': survival_censor,
+      'time_row_num': time_row,
+      'censor_row_num': censor_row,
+      'metadata_row_names': all_metadata_row_names,
       'gene_names': gene_names,
       'all_feature_names': feature_names,
       'all_features': features,
@@ -155,7 +162,7 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
 
   return cox_dict
 
-def write_file_with_results(input_file_name, results, outfile_location):
+def write_file_with_results(input_file_name, requested_data, results, outfile_location):
   input_file_name_slug = os.path.basename(input_file_name).split('.')[0]
   output_name = os.path.join(outfile_location, input_file_name_slug+'.out.csv')
   multivariates = results[0].keys()
@@ -163,7 +170,12 @@ def write_file_with_results(input_file_name, results, outfile_location):
   multivariates.remove('gene')
   multivariates.insert(0, 'gene')
 
+  time_row = requested_data['time_row_num']
+  censor_row = requested_data['censor_row_num']
+  print "Writing file..."
   with open(output_name, 'w') as outfile:
+    outfile.write('Survival Time Row, ' + requested_data['metadata_row_names'][time_row] + ', ' + str(time_row+1) + ', Note: row number excludes rows beginning with "!" from row count' + '\n')
+    outfile.write('Censor Row, ' + requested_data['metadata_row_names'][censor_row] + ', ' + str(censor_row+1) + '\n')
     outfile.write('Gene/Probe,'+ ', '.join([m + ' Z Score, ' + m + ' P Value' for m in multivariates]) + '\n')
     for result in results:
       outfile.write(result['name'])
@@ -174,6 +186,7 @@ def write_file_with_results(input_file_name, results, outfile_location):
           '{:g}'.format(result[m]['p'])
         )
       outfile.write('\n')
+  print "Complete!"
 
 def do_one_file(input_file, input_data, outdir="."):
   results = []
@@ -189,7 +202,7 @@ def do_one_file(input_file, input_data, outdir="."):
   except Exception as e:
     print "Something went wrong"
   finally:
-    write_file_with_results(input_file, results, outdir)
+    write_file_with_results(input_file, input_data, results, outdir)
 
 def do_files(files, outdir, multivariates=[]):
   for f in files:
