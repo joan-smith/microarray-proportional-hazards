@@ -1,4 +1,5 @@
 import sys
+import help_message
 
 def print_row_selection(row_titles):
   for i, title in enumerate(row_titles):
@@ -39,12 +40,17 @@ def repeating_row_selection(message, row_titles):
   return selections
 
 def get_row_titles(name):
-  with open(name) as f:
+  with open(name, 'rU') as f:
     row_titles = []
-    for line in f.readlines():
+    for i,line in enumerate(f.readlines()):
       row_title = line.split(',')[0]
-      if row_title == 'patient':
+      if row_title[0] == '!':
+        continue
+      if row_title == 'patient' or row_title == 'ID_REF':
         break
+      elif i > 50:
+        print "'patient' nor 'ID_REF' found. Aborting."
+        help_message.usage()
       else:
         row_titles.append(row_title)
   return row_titles
@@ -57,19 +63,5 @@ def import_file_interactive(name):
 
     additional_variables_rows = []
     additional_variables_rows = repeating_row_selection('Enter a number for an additional variable, "END" to finish selection: ', row_titles)
-
-    #TODO(joans): 8/30 actually make this work
-    gene_rows = []
-    gene_names = None
-    print 'Next you\'ll make gene selections. Note, after the first selection the gene names will be loaded'
-    while True:
-      selection = raw_input('Enter the name of a gene to use in multivariate analysis, "END" to finish selection: ')
-      if selection == 'END':
-        break
-      else:
-        if not gene_names:
-          gene_names = np.genfromtxt(file_name, use_cols=0, delimiter=',', dtype=None, filling_values='')
-        gene_rows.append(row_selection(selection, gene_names, exit_on_invalid=False))
-    ####
 
     return name, time_row_number, censor_row_number, additional_variables_rows

@@ -65,11 +65,18 @@ def get_formatted_row(row, formatter=lambda x: np.float(x)):
 
 def get_time_and_censor(cohort, time_row, censor_row):
   survival_time = get_formatted_row(cohort[time_row])
-  survival_censor = get_formatted_row(cohort[censor_row], lambda x: np.int(x))
+  try:
+    survival_censor = get_formatted_row(cohort[censor_row], lambda x: np.int(x))
+  except ValueError as e:
+    print 'Unsupported Input Error: Time and censor provided must be integers. Row: ' + str(censor_row) + '.'
+    print '   ', cohort[censor_row]
+    print 'To work around, please use interactive mode and select supported time, censor, and covariates.'
+    exit(1)
+
   return survival_time, survival_censor
 
 def import_file(name, time_row=0, censor_row=1, features_rows=None):
-  cohort = np.genfromtxt(name, delimiter=',', dtype=None, filling_values='')
+  cohort = np.genfromtxt(name, delimiter=',', dtype=None, filling_values='', comments="!")
   survival_time, survival_censor = get_time_and_censor(cohort, time_row, censor_row)
   row_headers = list(cohort[:,0])
 
