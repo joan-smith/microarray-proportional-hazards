@@ -82,8 +82,10 @@ def import_file(name, time_row=0, censor_row=1, features_rows=None):
 
   if 'patient' in row_headers:
     patient_row_idx = row_headers.index('patient')
+  elif 'ID_REF' in row_headers:
+    patient_row_idx = row_headers.index('ID_REF')
   else:
-    print 'Error: \'patient\' header not found'
+    print 'Error: \'patient\' or \'ID_REF\' header not found'
     help_message.usage()
 
   features, feature_names = get_features(features_rows, patient_row_idx, cohort)
