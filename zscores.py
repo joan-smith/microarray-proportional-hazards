@@ -254,7 +254,7 @@ def get_options(argv):
     if option in ('-m', '--mutlivariates'):
       multivariates = value.split(',')
   if not infile:
-    usage()
+    help_message.usage()
   interactive = ('--interactive', '') in opts
   return infile, outdir, multivariates, interactive
 
