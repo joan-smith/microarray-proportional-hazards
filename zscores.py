@@ -178,14 +178,15 @@ def write_file_with_results(input_file_name, requested_data, results, outfile_lo
     outfile.write('Censor Row, ' + requested_data['metadata_row_names'][censor_row] + ', ' + str(censor_row+1) + '\n')
     outfile.write('Gene/Probe,'+ ', '.join([m + ' Z Score, ' + m + ' P Value' for m in multivariates]) + '\n')
     for result in results:
-      outfile.write(result['name'])
-      for m in multivariates:
-        outfile.write(
-          ', ' +
-          '{:g}'.format(result[m]['z']) + ', ' +
-          '{:g}'.format(result[m]['p'])
-        )
-      outfile.write('\n')
+      if 'name' in result:
+        outfile.write(result['name'])
+        for m in multivariates:
+          outfile.write(
+            ', ' +
+            '{:g}'.format(result[m]['z']) + ', ' +
+            '{:g}'.format(result[m]['p'])
+          )
+        outfile.write('\n')
   print "Complete!"
 
 def do_one_file(input_file, input_data, outdir="."):
