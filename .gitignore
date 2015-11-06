@@ -3,3 +3,5 @@ test_data/
 *.pyc
 *.out.csv
 .Rapp*
+.RData
+.Rhistory
