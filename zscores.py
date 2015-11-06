@@ -153,7 +153,13 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
   coef_ind = list(coxuh_output.names).index('coefficients')
   coeffs = coxuh_output[coef_ind]
 
-  cox_dict = { 'name': gene_name }
+  patient_count_ind = list(coxuh_output.names).index('n')
+  patient_count = coxuh_output[patient_count_ind][0]
+
+  cox_dict = {
+      'name': gene_name,
+      'n': patient_count
+  }
   for multivariate in coeffs.rownames:
     cox_dict[multivariate] = {
       'z': coeffs.rx(multivariate, 'z')[0],
@@ -165,9 +171,14 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
 def write_file_with_results(input_file_name, requested_data, results, outfile_location):
   input_file_name_slug = os.path.basename(input_file_name).split('.')[0]
   output_name = os.path.join(outfile_location, input_file_name_slug+'.out.csv')
+
+  # get the list of requested multivariates to populate
+  # column titles, and make sure that they're ordered well
+  # with the gene first.
   multivariates = results[0].keys()
   multivariates.remove('name')
   multivariates.remove('gene')
+  multivariates.remove('n')
   multivariates.insert(0, 'gene')
 
   time_row = requested_data['time_row_num']
@@ -176,15 +187,15 @@ def write_file_with_results(input_file_name, requested_data, results, outfile_lo
   with open(output_name, 'w') as outfile:
     outfile.write('Survival Time Row, ' + requested_data['metadata_row_names'][time_row] + ', ' + str(time_row+1) + ', Note: row number excludes rows beginning with "!" from row count' + '\n')
     outfile.write('Censor Row, ' + requested_data['metadata_row_names'][censor_row] + ', ' + str(censor_row+1) + '\n')
-    outfile.write('Gene/Probe,'+ ', '.join([m + ' Z Score, ' + m + ' P Value' for m in multivariates]) + '\n')
+    outfile.write('Gene/Probe, Patient Count, ' + ', '.join([m + ' Z Score, ' + m + ' P Value' for m in multivariates]) + '\n')
     for result in results:
       if 'name' in result:
         outfile.write(result['name'])
+        outfile.write(', {:d}'.format(result['n']))
         for m in multivariates:
           outfile.write(
-            ', ' +
-            '{:g}'.format(result[m]['z']) + ', ' +
-            '{:g}'.format(result[m]['p'])
+            ', {:g}'.format(result[m]['z']) +
+            ', {:g}'.format(result[m]['p'])
           )
         outfile.write('\n')
   print "Complete!"
