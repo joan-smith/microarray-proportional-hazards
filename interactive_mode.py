@@ -1,5 +1,7 @@
 import sys
 import help_message
+import numpy as np
+import readline
 
 def print_row_selection(row_titles):
   for i, title in enumerate(row_titles):
@@ -39,6 +41,36 @@ def repeating_row_selection(message, row_titles):
       selections.append(row_selection)
   return selections
 
+def get_all_row_titles(fname):
+  return list(np.genfromtxt(fname, usecols=0, delimiter=',', dtype=None, filling_values=''))
+
+def probe_file_selection(message, fname):
+  file_continue = raw_input(message)
+  if file_continue == 'no':
+    return []
+
+  readline.parse_and_bind("tab: complete")
+  file_path = raw_input('Enter the path to the file with probes, one per line: ')
+  try:
+    probes_file = open(file_path, 'rU')
+    probes = probes_file.readlines()
+    probes = [probe.strip() for probe in probes]
+
+    probe_rows = []
+    row_titles = get_all_row_titles(fname)
+    for probe in probes:
+      if probe in row_titles:
+        print 'found probe: ', probe
+        probe_rows.append(row_titles.index(probe))
+      else:
+        print 'Warning: Probe', probe, 'not found in file.'
+
+    return probe_rows
+  except Exception as e:
+    print 'Error: failed to read file provided at ' + file_path
+    print e
+    exit(1)
+
 def get_row_titles(name):
   with open(name, 'rU') as f:
     row_titles = []
@@ -59,9 +91,15 @@ def import_file_interactive(name):
     row_titles = get_row_titles(name)
 
     time_row_number = row_selection('Enter number for row that has survival time: ', row_titles)
-    censor_row_number = row_selection('Enter number for row that has censor: ',row_titles)
+    censor_row_number = row_selection('Enter number for row that has censor: ',  row_titles)
 
     additional_variables_rows = []
     additional_variables_rows = repeating_row_selection('Enter a number for an additional variable, "END" to finish selection: ', row_titles)
 
-    return name, time_row_number, censor_row_number, additional_variables_rows
+    pcna25_rows = probe_file_selection('Add PCNA25? (yes or no): ', name)
+
+    return {'name': name,
+            'time_row': time_row_number,
+            'censor_row': censor_row_number,
+            'additional_variables': additional_variables_rows,
+            'pcna25_rows': pcna25_rows }

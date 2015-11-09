@@ -53,18 +53,37 @@ def get_feature_row_names(patient_row_idx, cohort):
   return [safe_string(name) for name in cohort[0:patient_row_idx,0]]
 
 def get_features(features_rows, patient_row_idx, cohort):
+  # non-interactive case, return all the features
+  #  we'll go through and select the ones we want later
   if features_rows == None:
     feature_names = [safe_string(name) for name in cohort[2:patient_row_idx,0]]
     features = cohort[2:patient_row_idx,1:]
   else:
+    # interactive case: requested features have been explicitly provided
     feature_names = [safe_string(name) for name in cohort[features_rows, 0]]
     features = cohort[features_rows,1:]
 
   features = clear_blanks(features)
   return features, feature_names
 
+def normalize_row(row_data):
+  mean = np.average(row_data)
+  return row_data - mean
+
+def get_pcna25(pcna25_rows, patient_row_idx, cohort):
+  normed_rows = []
+  for row in pcna25_rows:
+    normed_rows.append(normalize_row(get_formatted_row(cohort[row])))
+  return np.nanmean(normed_rows, 0)
+
 def get_formatted_row(row, formatter=lambda x: np.float(x)):
-  return [formatter(i) for i in row[1:] if len(i) > 0]
+  formatted = []
+  for i in row[1:]:
+    if len(i) >= 1:
+      formatted.append(formatter(i))
+    else:
+      formatted.append(np.nan)
+  return formatted
 
 def get_time_and_censor(cohort, time_row, censor_row):
   survival_time = get_formatted_row(cohort[time_row])
@@ -78,7 +97,7 @@ def get_time_and_censor(cohort, time_row, censor_row):
 
   return survival_time, survival_censor
 
-def import_file(name, time_row=0, censor_row=1, features_rows=None):
+def import_file(name, time_row=0, censor_row=1, features_rows=None, pcna25_rows=None):
   cohort = np.genfromtxt(name, delimiter=',', dtype=None, filling_values='', comments="!")
   survival_time, survival_censor = get_time_and_censor(cohort, time_row, censor_row)
   row_headers = list(cohort[:,0])
@@ -93,6 +112,11 @@ def import_file(name, time_row=0, censor_row=1, features_rows=None):
 
   features, feature_names = get_features(features_rows, patient_row_idx, cohort)
   all_metadata_row_names = get_feature_row_names(patient_row_idx, cohort)
+
+  if pcna25_rows and len(pcna25_rows) > 0:
+    pcna25 = get_pcna25(pcna25_rows, patient_row_idx, cohort)
+    feature_names.append('PCNA25')
+    features = np.vstack((features, pcna25))
 
   gene_names = row_headers[patient_row_idx+1:]
   patient_value = cohort[patient_row_idx+1:, 1:]
@@ -213,6 +237,7 @@ def do_one_file(input_file, input_data, outdir="."):
       results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names, features))
   except Exception as e:
     print "Something went wrong"
+    print e
   finally:
     write_file_with_results(input_file, input_data, results, outdir)
 
@@ -275,8 +300,15 @@ def main(argv=None):
     infile, outdir, multivariates, interactive = get_options(argv)
 
     if interactive:
-      name, time_row_number, censor_row_number, additional_variables_rows = interactive_mode.import_file_interactive(infile)
-      input_data = import_file(name, time_row_number, censor_row_number, features_rows=additional_variables_rows)
+      requested = interactive_mode.import_file_interactive(infile)
+
+      input_data = import_file(
+          requested['name'],
+          requested['time_row'],
+          requested['censor_row'],
+          features_rows=requested['additional_variables'],
+          pcna25_rows=requested['pcna25_rows'])
+
       # in this case the returned features from the interactive import
       # keyed by all_features, are in fact the only ones we care about
       # so move them.
