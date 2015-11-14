@@ -64,7 +64,13 @@ def get_features(features_rows, patient_row_idx, cohort):
   return features, feature_names
 
 def get_formatted_row(row, formatter=lambda x: np.float(x)):
-  return [formatter(i) for i in row[1:] if len(i) > 0]
+  formatted = []
+  for i in row[1:]:
+    if len(i) >= 1:
+      formatted.append(formatter(i))
+    else:
+      formatted.append(np.nan)
+  return formatted
 
 def get_time_and_censor(cohort, time_row, censor_row):
   survival_time = get_formatted_row(cohort[time_row])
