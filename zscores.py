@@ -178,18 +178,24 @@ def write_file_with_results(input_file_name, requested_data, results, outfile_lo
   input_file_name_slug = os.path.basename(input_file_name).split('.')[0]
   output_name = os.path.join(outfile_location, input_file_name_slug+'.out.csv')
 
+  print "Writing file..."
+
   # get the list of requested multivariates to populate
   # column titles, and make sure that they're ordered well
   # with the gene first.
-  multivariates = results[0].keys()
-  multivariates.remove('name')
-  multivariates.remove('gene')
-  multivariates.remove('n')
-  multivariates.insert(0, 'gene')
+  multivariates = None
+  i = 0
+  while multivariates == None:
+    if len(results[i].keys()) > 0:
+      multivariates = results[i].keys()
+      multivariates.remove('name')
+      multivariates.remove('gene')
+      multivariates.remove('n')
+      multivariates.insert(0, 'gene')
+    i += 1
 
   time_row = requested_data['time_row_num']
   censor_row = requested_data['censor_row_num']
-  print "Writing file..."
   with open(output_name, 'w') as outfile:
     outfile.write('Survival Time Row, ' + requested_data['metadata_row_names'][time_row] + ', ' + str(time_row+1) + ', Note: row number excludes rows beginning with "!" from row count' + '\n')
     outfile.write('Censor Row, ' + requested_data['metadata_row_names'][censor_row] + ', ' + str(censor_row+1) + '\n')
