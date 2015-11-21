@@ -128,15 +128,16 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
     if np.isnan(expn_value[i]):
       skip_cols.append(i)
 
+  if len(skip_cols) > (len(expn_value)/2):
+    print 'warning: not enough samples for row ' + gene_name + ', skipping.'
+    return {}
+
   expn_value = np.delete(expn_value, skip_cols)
   surv_time = np.delete(surv_time, skip_cols)
   surv_censor = np.delete(surv_censor, skip_cols)
   if len(feature_names) >= 1:
     features = np.delete(features, skip_cols, 1)
 
-  if len(expn_value) < 10:
-    print 'warning: not enough samples for row ' + gene_name + ', skipping.'
-    return {}
 
   r.assign('time', surv_time)
   r.assign('censor', surv_censor)
@@ -185,7 +186,7 @@ def write_file_with_results(input_file_name, requested_data, results, outfile_lo
   # with the gene first.
   multivariates = None
   i = 0
-  while multivariates == None:
+  while multivariates == None and i < len(results):
     if len(results[i].keys()) > 0:
       multivariates = results[i].keys()
       multivariates.remove('name')
@@ -193,6 +194,10 @@ def write_file_with_results(input_file_name, requested_data, results, outfile_lo
       multivariates.remove('n')
       multivariates.insert(0, 'gene')
     i += 1
+  if i == len(results):
+    print 'Error: no results'
+    exit(1)
+
 
   time_row = requested_data['time_row_num']
   censor_row = requested_data['censor_row_num']
@@ -225,6 +230,7 @@ def do_one_file(input_file, input_data, outdir="."):
       results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names, features))
   except Exception as e:
     print "Something went wrong"
+    print e
   finally:
     write_file_with_results(input_file, input_data, results, outdir)
 
