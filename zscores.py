@@ -33,6 +33,7 @@ from rpy2.robjects.packages import importr
 from rpy2.rpy_classic import r as r_old
 import rpy2.robjects.numpy2ri
 from rpy2.robjects import r
+import rpy2.robjects as robjects
 rpy2.robjects.numpy2ri.activate()
 
 import help_message
@@ -50,14 +51,14 @@ def clear_blanks(rows):
   return rows
 
 def get_feature_row_names(patient_row_idx, cohort):
-  return [safe_string(name) for name in cohort[0:patient_row_idx,0]]
+  return [name for name in cohort[0:patient_row_idx,0]]
 
 def get_features(features_rows, patient_row_idx, cohort):
   if features_rows == None:
-    feature_names = [safe_string(name) for name in cohort[2:patient_row_idx,0]]
+    feature_names = [name for name in cohort[2:patient_row_idx,0]]
     features = cohort[2:patient_row_idx,1:]
   else:
-    feature_names = [safe_string(name) for name in cohort[features_rows, 0]]
+    feature_names = [name for name in cohort[features_rows, 0]]
     features = cohort[features_rows,1:]
 
   features = clear_blanks(features)
@@ -141,13 +142,26 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
 
   r.assign('time', surv_time)
   r.assign('censor', surv_censor)
+  safe_feature_names = []
   for idx, feature_name in enumerate(feature_names):
-    float_features = features[idx].astype(np.float)
-    r.assign(feature_name, float_features)
+    if 'factor(' in feature_name:
+      match =  re.search('factor\((.*)\): (.*)', feature_name)
+      reference = match.group(1)
+      factor_feature_name = safe_string(match.group(2))
+      features = features[idx].astype(str)
+      r.assign(factor_feature_name, robjects.FactorVector(features))
+      # Once we have a feature set up in R, we need to set the reference level:
+      #  r(feature_name <- relevel(feature_name, reference_level))
+      r(factor_feature_name + ' <- relevel('+ factor_feature_name +', "' + reference + '")')
+      safe_feature_names.append(factor_feature_name)
+    else:
+      features = features[idx].astype(np.float)
+      safe_feature_names.append(safe_string(feature_name))
+      r.assign(safe_string(feature_name), features)
   formula_string = ''
-  if len(feature_names) >= 1:
-    formula_string = 'gene + ' + ' + '.join(feature_names)
-    data_frame_string = 'gene, '+ ', '.join(feature_names)
+  if len(safe_feature_names) >= 1:
+    formula_string = 'gene + ' + ' + '.join(safe_feature_names)
+    data_frame_string = 'gene, '+ ', '.join(safe_feature_names)
   else:
     formula_string = 'gene'
     data_frame_string = 'gene'
@@ -242,20 +256,19 @@ def do_files(files, outdir, multivariates=[]):
     input_data['feature_names'] = []
     # select the requested features
     for variable in multivariates:
-      safe_feature_name = safe_string(variable)
-      if safe_feature_name == 'all':
+      if variable == 'all':
         # make sure that user didn't ask for all + specific features
         if len(multivariates) == 1:
           input_data['features'] = input_data['all_features']
         else:
           print 'Error: All features requested for multivariate calculation, but additional provided, ' + ', '.join(multivariates)
           sys.exit(2)
-      elif not safe_feature_name in feature_names:
-        print 'Error: Requested multivariate ' + safe_feature_name + ' not found in given features, ' + ', '.join(features)
+      elif not variable in feature_names:
+        print 'Error: Requested multivariate ' + variable + ' not found in given features, ' + ', '.join(features)
         sys.exit(2)
       else:
-        feature_idx = feature_names.index(safe_feature_name)
-        input_data['feature_names'].append(safe_feature_name)
+        feature_idx = feature_names.index(variable)
+        input_data['feature_names'].append(variable)
         input_data['features'].append(input_data['all_features'][feature_idx])
 
       do_one_file(f, input_data, outdir)
