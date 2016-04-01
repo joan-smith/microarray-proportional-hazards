@@ -61,6 +61,7 @@ def get_features(features_rows, patient_row_idx, cohort):
     feature_names = [name for name in cohort[features_rows, 0]]
     features = cohort[features_rows,1:]
 
+  # replaces blanks with nans.
   features = clear_blanks(features)
   return features, feature_names
 
@@ -98,6 +99,8 @@ def import_file(name, time_row=0, censor_row=1, features_rows=None):
     print 'Error: \'patient\' or \'ID_REF\' header not found'
     help_message.usage()
 
+  # Note: these return *all* the metadata rows if feature_rows is None,
+  # or the selected ones if feature_rows is set.
   features, feature_names = get_features(features_rows, patient_row_idx, cohort)
   all_metadata_row_names = get_feature_row_names(patient_row_idx, cohort)
 
@@ -119,6 +122,13 @@ def import_file(name, time_row=0, censor_row=1, features_rows=None):
   }
   return input_data
 
+# params:
+#  gene_name (string): name of gene to calculate multivariate for
+#  expn_value (np array, float): expression value for every patient for that gene
+#  surv_time (np array, float): survival time for each patient
+#  surv_censor (np array, 0 or 1): survival censor for each patient
+#  feature names (string list): list of names of multivariate features
+#  features (np array float, shape=[len(feature_names)][len(patients)]): multivariate data for cox.
 def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features):
   rpy.set_default_mode(rpy.NO_CONVERSION)
   r_old.library('survival')
@@ -306,13 +316,19 @@ def main(argv=None):
     infile, outdir, multivariates, interactive = get_options(argv)
 
     if interactive:
-      name, time_row_number, censor_row_number, additional_variables_rows = interactive_mode.import_file_interactive(infile)
-      input_data = import_file(name, time_row_number, censor_row_number, features_rows=additional_variables_rows)
+      selections = interactive_mode.import_file_interactive(infile)
+      input_data = import_file(
+          selections['name'],
+          selections['time_row_number'],
+          selections['censor_row_number'],
+          features_rows=selections['additional_variables_rows'])
+
       # in this case the returned features from the interactive import
       # keyed by all_features, are in fact the only ones we care about
       # so move them.
       input_data['features'] = input_data['all_features']
       input_data['feature_names'] = input_data['all_feature_names']
+
       do_one_file(infile, input_data, outdir)
       sys.exit(0);
     else:
