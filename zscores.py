@@ -360,9 +360,34 @@ def requested_features(gene_signature_names, gene_signatures, feature_names, fea
     multivariates = features
     multivariate_names = feature_names
   else:
-    multivariates = np.vstack([gene_signatures, features]])
+    multivariates = np.vstack([gene_signatures, features])
     multivariate_names = gene_signature_names + feature_names
   return multivariate_names, multivariates
+
+def script_run(
+    input_file_path,
+    time_row_title,
+    censor_row_title,
+    metadata_feature_rows=[],
+    probe_set_files=[],
+    outdir='.'):
+
+  row_titles = interactive_mode.get_row_titles(input_file_path)
+  time_row_number = get_row_number_from_title(time_row_title, row_titles)
+  censor_row_number = get_row_number_from_title(censor_row_title, row_titles)
+  metadata_feature_row_numbers = [get_row_number_from_title(feature_title, row_titles) for feature_title in metadata_feature_rows]
+  gene_signature_probe_sets = [interactive_mode.gene_signature_probe_set_from_file(probe_set) for probe_set in probe_set_files]
+
+  input_data = import_file(input_file_path, time_row_number, censor_row_number, metadata_feature_row_numbers)
+  gene_signature_names, gene_signatures = parse_gene_signatures(input_data['gene_names'], input_data['patient_values'], gene_signature_probe_sets)
+
+  input_data['feature_names'], input_data['features'] = requested_features(
+      gene_signature_names,
+      gene_signatures,
+      input_data['metadata_feature_names'],
+      input_data['metadata_features'])
+
+  do_one_file(input_file_path, input_data, outdir)
 
 def main(argv=None):
   if argv is None:
