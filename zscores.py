@@ -122,6 +122,34 @@ def import_file(name, time_row=0, censor_row=1, features_rows=None):
   }
   return input_data
 
+def parse_gene_signatures(gene_names, patient_values, gene_signature_probe_sets):
+  gene_signature_names = []
+  gene_signatures = []
+  #  for each probe:
+  #    normalize probe values to 0 by average
+  #    add normalized values to new array for probes
+  #  average new array by column, treating nans appropriately.
+  #  add averaged array to gene signature, and names to names
+  for signature_name, gene_set in gene_signature_probe_sets:
+    selected_genes = []
+    normed_selected_gene_patient_values = np.empty((len(gene_set), patient_values.shape[1]))
+    for i,gene in enumerate(gene_set):
+      if not gene in gene_names:
+        print 'Warn: probe/gene', gene, ' from ', signature_name, ' not found in input file'
+        continue
+      gene_index = gene_names.index(gene)
+      gene_patient_values = patient_values[gene_index]
+      # in order to ingore nans in the average, use nanmean
+      avg_gene_patient_value = np.nanmean(gene_patient_values, dtype=np.float64)
+      normed_gene_patient_values = np.subtract(gene_patient_values, avg_gene_patient_value)
+      normed_selected_gene_patient_values[i] = normed_gene_patient_values
+
+    averaged_gene_signature = np.nanmean(normed_selected_gene_patient_values, axis=0, dtype=np.float64)
+    gene_signature_names.append(signature_name)
+    gene_signatures.append(averaged_gene_signature)
+
+  return gene_signature_names, gene_signatures
+
 # params:
 #  gene_name (string): name of gene to calculate multivariate for
 #  expn_value (np array, float): expression value for every patient for that gene
@@ -323,12 +351,19 @@ def main(argv=None):
           selections['censor_row_number'],
           features_rows=selections['additional_variables_rows'])
 
-      # in this case the returned features from the interactive import
-      # keyed by all_features, are in fact the only ones we care about
-      # so move them.
-      input_data['features'] = input_data['all_features']
-      input_data['feature_names'] = input_data['all_feature_names']
+      gene_signature_names, gene_signatures = parse_gene_signatures(input_data['gene_names'], input_data['patient_values'], selections['gene_signature_probe_sets'])
 
+      # in the interactive case, the features returned by import and
+      # keyed by all_features, are the selected features.
+      # so move them, and if necessary, add the new parsed gene_signature rows
+      if len(gene_signature_names) == 0:
+        multivariates = input_data['all_features']
+        multivariate_names = input_data['all_feature_names']
+      else:
+        multivariates = np.vstack([gene_signatures, input_data['all_features']])
+        multivariate_names = gene_signature_names + input_data['all_feature_names']
+      input_data['features'] = multivariates
+      input_data['feature_names'] = multivariate_names
       do_one_file(infile, input_data, outdir)
       sys.exit(0);
     else:

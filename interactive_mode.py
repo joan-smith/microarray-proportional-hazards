@@ -2,6 +2,7 @@ import sys
 import help_message
 import readline
 import os
+import numpy as np
 
 def print_row_selection(row_titles):
   for i, title in enumerate(row_titles):
@@ -54,9 +55,11 @@ def repeating_gene_signature_row_set(prompt):
       sys.exit(1)
     with open(probe_set_file,'r') as f:
       probe_set = f.read().strip().split('\n')
+    probe_set = np.genfromtxt(probe_set_file, delimiter=',', dtype=str, usecols=[0], skip_header=1)
     probe_set_name = os.path.basename(probe_set_file).split('.')[0]
-    print probe_set_name
-    print probe_set
+    dashes = probe_set_name.split('-')
+    if len(dashes) == 2:
+      probe_set_name = dashes[1]
     selections.append((probe_set_name, probe_set))
   return selections
 
