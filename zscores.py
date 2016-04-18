@@ -193,9 +193,9 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
       r(factor_feature_name + ' <- relevel('+ factor_feature_name +', "' + reference + '")')
       safe_feature_names.append(factor_feature_name)
     else:
-      features = features[idx].astype(np.float)
+      feature = features[idx].astype(np.float)
       safe_feature_names.append(safe_string(feature_name))
-      r.assign(safe_string(feature_name), features)
+      r.assign(safe_string(feature_name), feature)
   formula_string = ''
   if len(safe_feature_names) >= 1:
     formula_string = 'gene + ' + ' + '.join(safe_feature_names)
@@ -256,6 +256,7 @@ def write_file_with_results(input_file_name, requested_data, results, outfile_lo
   with open(output_name, 'w') as outfile:
     outfile.write('Survival Time Row, ' + requested_data['metadata_row_names'][time_row] + ', ' + str(time_row+1) + ', Note: row number excludes rows beginning with "!" from row count' + '\n')
     outfile.write('Censor Row, ' + requested_data['metadata_row_names'][censor_row] + ', ' + str(censor_row+1) + '\n')
+    print 'Gene/Probe, Patient Count, ' + ', '.join([m + ' Z Score, ' + m + ' P Value' for m in multivariates]) + '\n'
     outfile.write('Gene/Probe, Patient Count, ' + ', '.join([m + ' Z Score, ' + m + ' P Value' for m in multivariates]) + '\n')
     for result in results:
       if 'name' in result:
