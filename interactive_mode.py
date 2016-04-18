@@ -42,6 +42,17 @@ def repeating_row_selection(message, row_titles):
       selections.append(row_selection)
   return selections
 
+
+def gene_signature_probe_set_from_file(probe_set_file):
+  with open(probe_set_file,'r') as f:
+    probe_set = f.read().strip().split('\n')
+  probe_set = np.genfromtxt(probe_set_file, delimiter=',', dtype=str, usecols=[0], skip_header=1)
+  probe_set_name = os.path.basename(probe_set_file).split('.')[0]
+  dashes = probe_set_name.split('-')
+  if len(dashes) == 2:
+    probe_set_name = dashes[1]
+  return probe_set_name, probe_set
+
 def repeating_gene_signature_row_set(prompt):
   selections = []
   readline.parse_and_bind("tab: complete")
@@ -53,13 +64,7 @@ def repeating_gene_signature_row_set(prompt):
     if not os.path.isfile(probe_set_file):
       print 'Error: File not found: ', probe_set_file
       sys.exit(1)
-    with open(probe_set_file,'r') as f:
-      probe_set = f.read().strip().split('\n')
-    probe_set = np.genfromtxt(probe_set_file, delimiter=',', dtype=str, usecols=[0], skip_header=1)
-    probe_set_name = os.path.basename(probe_set_file).split('.')[0]
-    dashes = probe_set_name.split('-')
-    if len(dashes) == 2:
-      probe_set_name = dashes[1]
+    probe_set_name, probe_set = gene_signature_probe_set_from_file(probe_set_file)
     selections.append((probe_set_name, probe_set))
   return selections
 

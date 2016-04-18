@@ -26,6 +26,7 @@ import pdb
 import sys
 import re
 import os
+import traceback
 import getopt
 import numpy as np
 import rpy2.rpy_classic as rpy
@@ -86,6 +87,9 @@ def get_time_and_censor(cohort, time_row, censor_row):
 
   return survival_time, survival_censor
 
+# Returns a dictionary with relevant data from the imported file.
+# Note that metadata_features will contain ALL the metadata features
+# if (and only if) feature_rows is set to none.
 def import_file(name, time_row=0, censor_row=1, features_rows=None):
   cohort = np.genfromtxt(name, delimiter=',', dtype=None, filling_values='', comments="!")
   survival_time, survival_censor = get_time_and_censor(cohort, time_row, censor_row)
@@ -117,8 +121,8 @@ def import_file(name, time_row=0, censor_row=1, features_rows=None):
       'censor_row_num': censor_row,
       'metadata_row_names': all_metadata_row_names,
       'gene_names': gene_names,
-      'all_feature_names': feature_names,
-      'all_features': features,
+      'metadata_feature_names': feature_names,
+      'metadata_features': features,
   }
   return input_data
 
@@ -135,7 +139,6 @@ def parse_gene_signatures(gene_names, patient_values, gene_signature_probe_sets)
     normed_selected_gene_patient_values = np.empty((len(gene_set), patient_values.shape[1]))
     for i,gene in enumerate(gene_set):
       if not gene in gene_names:
-        print 'Warn: probe/gene', gene, ' from ', signature_name, ' not found in input file'
         continue
       gene_index = gene_names.index(gene)
       gene_patient_values = patient_values[gene_index]
@@ -168,7 +171,6 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
       skip_cols.append(i)
 
   if len(skip_cols) > (len(expn_value)/2):
-    print 'warning: not enough samples for row ' + gene_name + ', skipping.'
     return {}
 
   expn_value = np.delete(expn_value, skip_cols)
@@ -186,8 +188,8 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
       match =  re.search('factor\((.*)\): (.*)', feature_name)
       reference = match.group(1)
       factor_feature_name = safe_string(match.group(2))
-      features = features[idx].astype(str)
-      r.assign(factor_feature_name, robjects.FactorVector(features))
+      feature = features[idx].astype(str)
+      r.assign(factor_feature_name, robjects.FactorVector(feature))
       # Once we have a feature set up in R, we need to set the reference level:
       #  r(feature_name <- relevel(feature_name, reference_level))
       r(factor_feature_name + ' <- relevel('+ factor_feature_name +', "' + reference + '")')
@@ -284,11 +286,16 @@ def do_one_file(input_file, input_data, outdir="."):
   except Exception as e:
     print "Something went wrong"
     print e
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    traceback.print_exception(exc_type, exc_value, exc_traceback,
+                                      limit=2, file=sys.stdout)
   finally:
     write_file_with_results(input_file, input_data, results, outdir)
 
 def do_files(files, outdir, multivariates=[]):
   for f in files:
+    # this is the case where metadata_features will contain
+    # all the possible features. Go through and pick the requested ones below
     input_data = import_file(f)
 
     input_data['features'] = []
@@ -298,7 +305,7 @@ def do_files(files, outdir, multivariates=[]):
       if variable == 'all':
         # make sure that user didn't ask for all + specific features
         if len(multivariates) == 1:
-          input_data['features'] = input_data['all_features']
+          input_data['features'] = input_data['metadata_features']
         else:
           print 'Error: All features requested for multivariate calculation, but additional provided, ' + ', '.join(multivariates)
           sys.exit(2)
@@ -308,7 +315,7 @@ def do_files(files, outdir, multivariates=[]):
       else:
         feature_idx = feature_names.index(variable)
         input_data['feature_names'].append(variable)
-        input_data['features'].append(input_data['all_features'][feature_idx])
+        input_data['features'].append(input_data['metadata_features'][feature_idx])
 
       do_one_file(f, input_data, outdir)
 
@@ -332,12 +339,56 @@ def get_options(argv):
       infile = value
     if option in ('-o', '--output-directory'):
       outdir = value
+    #TODO(joans): process this by looking up row numbers so that
+    # all the weird complexity of metadata_features sometimes having
+    # all the features can go away
     if option in ('-m', '--mutlivariates'):
       multivariates = value.split(',')
   if not infile:
     help_message.usage()
   interactive = ('--interactive', '') in opts
   return infile, outdir, multivariates, interactive
+
+def get_row_number_from_title(title, row_titles):
+  if row_titles.count(title) != 1:
+    raise ValueError(title, row_titles)
+  return row_titles.index(title)
+
+# combine the genes signature features with the metadata features to produce
+# the full list of multivariates for cox
+def requested_features(gene_signature_names, gene_signatures, feature_names, features):
+  if len(gene_signature_names) == 0:
+    multivariates = features
+    multivariate_names = feature_names
+  else:
+    multivariates = np.vstack([gene_signatures, features])
+    multivariate_names = gene_signature_names + feature_names
+  return multivariate_names, multivariates
+
+def script_run(
+    input_file_path,
+    time_row_title,
+    censor_row_title,
+    metadata_feature_rows=[],
+    probe_set_files=[],
+    outdir='.'):
+
+  row_titles = interactive_mode.get_row_titles(input_file_path)
+  time_row_number = get_row_number_from_title(time_row_title, row_titles)
+  censor_row_number = get_row_number_from_title(censor_row_title, row_titles)
+  metadata_feature_row_numbers = [get_row_number_from_title(feature_title, row_titles) for feature_title in metadata_feature_rows]
+  gene_signature_probe_sets = [interactive_mode.gene_signature_probe_set_from_file(probe_set) for probe_set in probe_set_files]
+
+  input_data = import_file(input_file_path, time_row_number, censor_row_number, metadata_feature_row_numbers)
+  gene_signature_names, gene_signatures = parse_gene_signatures(input_data['gene_names'], input_data['patient_values'], gene_signature_probe_sets)
+
+  input_data['feature_names'], input_data['features'] = requested_features(
+      gene_signature_names,
+      gene_signatures,
+      input_data['metadata_feature_names'],
+      input_data['metadata_features'])
+
+  do_one_file(input_file_path, input_data, outdir)
 
 def main(argv=None):
   if argv is None:
@@ -354,17 +405,11 @@ def main(argv=None):
 
       gene_signature_names, gene_signatures = parse_gene_signatures(input_data['gene_names'], input_data['patient_values'], selections['gene_signature_probe_sets'])
 
-      # in the interactive case, the features returned by import and
-      # keyed by all_features, are the selected features.
-      # so move them, and if necessary, add the new parsed gene_signature rows
-      if len(gene_signature_names) == 0:
-        multivariates = input_data['all_features']
-        multivariate_names = input_data['all_feature_names']
-      else:
-        multivariates = np.vstack([gene_signatures, input_data['all_features']])
-        multivariate_names = gene_signature_names + input_data['all_feature_names']
-      input_data['features'] = multivariates
-      input_data['feature_names'] = multivariate_names
+      input_data['feature_names'], input_data['features'] = requested_features(
+          gene_signature_names,
+          gene_signatures,
+          input_data['metadata_feature_names'],
+          input_data['metadata_features'])
       do_one_file(infile, input_data, outdir)
       sys.exit(0);
     else:
