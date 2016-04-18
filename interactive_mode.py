@@ -1,5 +1,8 @@
 import sys
 import help_message
+import readline
+import os
+import numpy as np
 
 def print_row_selection(row_titles):
   for i, title in enumerate(row_titles):
@@ -39,6 +42,27 @@ def repeating_row_selection(message, row_titles):
       selections.append(row_selection)
   return selections
 
+def repeating_gene_signature_row_set(prompt):
+  selections = []
+  readline.parse_and_bind("tab: complete")
+  while True:
+    probe_set_file = raw_input(prompt)
+    if probe_set_file == 'END':
+      break
+
+    if not os.path.isfile(probe_set_file):
+      print 'Error: File not found: ', probe_set_file
+      sys.exit(1)
+    with open(probe_set_file,'r') as f:
+      probe_set = f.read().strip().split('\n')
+    probe_set = np.genfromtxt(probe_set_file, delimiter=',', dtype=str, usecols=[0], skip_header=1)
+    probe_set_name = os.path.basename(probe_set_file).split('.')[0]
+    dashes = probe_set_name.split('-')
+    if len(dashes) == 2:
+      probe_set_name = dashes[1]
+    selections.append((probe_set_name, probe_set))
+  return selections
+
 def get_row_titles(name):
   with open(name, 'rU') as f:
     row_titles = []
@@ -64,4 +88,13 @@ def import_file_interactive(name):
     additional_variables_rows = []
     additional_variables_rows = repeating_row_selection('Enter a number for an additional variable, "END" to finish selection: ', row_titles)
 
-    return name, time_row_number, censor_row_number, additional_variables_rows
+    gene_signature_probe_sets = repeating_gene_signature_row_set('Enter a file containing a list of probes to calculate a gene signature as a multivariate, or "END" to finish selection: ')
+
+
+    return {
+        'name': name,
+        'time_row_number': time_row_number,
+        'censor_row_number': censor_row_number,
+        'additional_variables_rows': additional_variables_rows,
+        'gene_signature_probe_sets': gene_signature_probe_sets
+        }
