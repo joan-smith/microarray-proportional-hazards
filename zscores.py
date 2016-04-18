@@ -87,6 +87,9 @@ def get_time_and_censor(cohort, time_row, censor_row):
 
   return survival_time, survival_censor
 
+# Returns a dictionary with relevant data from the imported file.
+# Note that metadata_features will contain ALL the metadata features
+# if (and only if) feature_rows is set to none.
 def import_file(name, time_row=0, censor_row=1, features_rows=None):
   cohort = np.genfromtxt(name, delimiter=',', dtype=None, filling_values='', comments="!")
   survival_time, survival_censor = get_time_and_censor(cohort, time_row, censor_row)
@@ -118,8 +121,8 @@ def import_file(name, time_row=0, censor_row=1, features_rows=None):
       'censor_row_num': censor_row,
       'metadata_row_names': all_metadata_row_names,
       'gene_names': gene_names,
-      'all_feature_names': feature_names,
-      'all_features': features,
+      'metadata_feature_names': feature_names,
+      'metadata_features': features,
   }
   return input_data
 
@@ -292,6 +295,8 @@ def do_one_file(input_file, input_data, outdir="."):
 
 def do_files(files, outdir, multivariates=[]):
   for f in files:
+    # this is the case where metadata_features will contain
+    # all the possible features. Go through and pick the requested ones below
     input_data = import_file(f)
 
     input_data['features'] = []
@@ -301,7 +306,7 @@ def do_files(files, outdir, multivariates=[]):
       if variable == 'all':
         # make sure that user didn't ask for all + specific features
         if len(multivariates) == 1:
-          input_data['features'] = input_data['all_features']
+          input_data['features'] = input_data['metadata_features']
         else:
           print 'Error: All features requested for multivariate calculation, but additional provided, ' + ', '.join(multivariates)
           sys.exit(2)
@@ -311,7 +316,7 @@ def do_files(files, outdir, multivariates=[]):
       else:
         feature_idx = feature_names.index(variable)
         input_data['feature_names'].append(variable)
-        input_data['features'].append(input_data['all_features'][feature_idx])
+        input_data['features'].append(input_data['metadata_features'][feature_idx])
 
       do_one_file(f, input_data, outdir)
 
@@ -335,12 +340,31 @@ def get_options(argv):
       infile = value
     if option in ('-o', '--output-directory'):
       outdir = value
+    #TODO(joans): process this by looking up row numbers so that
+    # all the weird complexity of metadata_features sometimes having
+    # all the features can go away
     if option in ('-m', '--mutlivariates'):
       multivariates = value.split(',')
   if not infile:
     help_message.usage()
   interactive = ('--interactive', '') in opts
   return infile, outdir, multivariates, interactive
+
+def get_row_number_from_title(title, row_titles):
+  if row_titles.count(title) != 1:
+    raise ValueError(title, row_titles)
+  return row_titles.index(title)
+
+# combine the genes signature features with the metadata features to produce
+# the full list of multivariates for cox
+def requested_features(gene_signature_names, gene_signatures, feature_names, features):
+  if len(gene_signature_names) == 0:
+    multivariates = features
+    multivariate_names = feature_names
+  else:
+    multivariates = np.vstack([gene_signatures, features]])
+    multivariate_names = gene_signature_names + feature_names
+  return multivariate_names, multivariates
 
 def main(argv=None):
   if argv is None:
@@ -357,17 +381,11 @@ def main(argv=None):
 
       gene_signature_names, gene_signatures = parse_gene_signatures(input_data['gene_names'], input_data['patient_values'], selections['gene_signature_probe_sets'])
 
-      # in the interactive case, the features returned by import and
-      # keyed by all_features, are the selected features.
-      # so move them, and if necessary, add the new parsed gene_signature rows
-      if len(gene_signature_names) == 0:
-        multivariates = input_data['all_features']
-        multivariate_names = input_data['all_feature_names']
-      else:
-        multivariates = np.vstack([gene_signatures, input_data['all_features']])
-        multivariate_names = gene_signature_names + input_data['all_feature_names']
-      input_data['features'] = multivariates
-      input_data['feature_names'] = multivariate_names
+      input_data['feature_names'], input_data['features'] = requested_features(
+          gene_signature_names,
+          gene_signatures,
+          input_data['metadata_feature_names'],
+          input_data['metadata_features'])
       do_one_file(infile, input_data, outdir)
       sys.exit(0);
     else:
