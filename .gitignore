@@ -1,5 +1,6 @@
 .DS_Store
 test_data/
+data/
 *.pyc
 *.out.csv
 .Rapp*
