@@ -139,7 +139,6 @@ def parse_gene_signatures(gene_names, patient_values, gene_signature_probe_sets)
     normed_selected_gene_patient_values = np.empty((len(gene_set), patient_values.shape[1]))
     for i,gene in enumerate(gene_set):
       if not gene in gene_names:
-        print 'Warn: probe/gene', gene, ' from ', signature_name, ' not found in input file'
         continue
       gene_index = gene_names.index(gene)
       gene_patient_values = patient_values[gene_index]
@@ -172,7 +171,6 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
       skip_cols.append(i)
 
   if len(skip_cols) > (len(expn_value)/2):
-    print 'warning: not enough samples for row ' + gene_name + ', skipping.'
     return {}
 
   expn_value = np.delete(expn_value, skip_cols)
