@@ -26,6 +26,7 @@ import pdb
 import sys
 import re
 import os
+import traceback
 import getopt
 import numpy as np
 import rpy2.rpy_classic as rpy
@@ -256,7 +257,6 @@ def write_file_with_results(input_file_name, requested_data, results, outfile_lo
   with open(output_name, 'w') as outfile:
     outfile.write('Survival Time Row, ' + requested_data['metadata_row_names'][time_row] + ', ' + str(time_row+1) + ', Note: row number excludes rows beginning with "!" from row count' + '\n')
     outfile.write('Censor Row, ' + requested_data['metadata_row_names'][censor_row] + ', ' + str(censor_row+1) + '\n')
-    print 'Gene/Probe, Patient Count, ' + ', '.join([m + ' Z Score, ' + m + ' P Value' for m in multivariates]) + '\n'
     outfile.write('Gene/Probe, Patient Count, ' + ', '.join([m + ' Z Score, ' + m + ' P Value' for m in multivariates]) + '\n')
     for result in results:
       if 'name' in result:
@@ -284,6 +284,9 @@ def do_one_file(input_file, input_data, outdir="."):
   except Exception as e:
     print "Something went wrong"
     print e
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    traceback.print_exception(exc_type, exc_value, exc_traceback,
+                                      limit=2, file=sys.stdout)
   finally:
     write_file_with_results(input_file, input_data, results, outdir)
 
