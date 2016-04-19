@@ -258,7 +258,6 @@ def write_file_with_results(input_file_name, requested_data, results, outfile_lo
   with open(output_name, 'w') as outfile:
     outfile.write('Survival Time Row, ' + requested_data['metadata_row_names'][time_row] + ', ' + str(time_row+1) + ', Note: row number excludes rows beginning with "!" from row count' + '\n')
     outfile.write('Censor Row, ' + requested_data['metadata_row_names'][censor_row] + ', ' + str(censor_row+1) + '\n')
-    print 'Gene/Probe, Patient Count, ' + ', '.join([m + ' Z Score, ' + m + ' P Value' for m in multivariates]) + '\n'
     outfile.write('Gene/Probe, Patient Count, ' + ', '.join([m + ' Z Score, ' + m + ' P Value' for m in multivariates]) + '\n')
     for result in results:
       if 'name' in result:
