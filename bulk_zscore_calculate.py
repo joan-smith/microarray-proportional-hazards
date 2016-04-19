@@ -50,7 +50,7 @@ def do_work(indir, outdir, notes_file, probe_sets):
   # 4... Optional Metadata Features
   notes = np.genfromtxt(notes_file, dtype=None, delimiter=',')
 
-  pool = multiprocessing.Pool(4)
+  pool = multiprocessing.Pool(16)
   remaining_args = [indir, outdir, probe_sets]
   pool.map(run_zscore_star, itertools.izip(notes[1:], itertools.repeat(remaining_args)))
 
@@ -82,7 +82,7 @@ def get_options(argv):
 
 def main(argv=None):
   if argv == None:
-    argv = sys.argv
+     argv = sys.argv
   indir, outdir, notes_file, probe_sets = get_options(argv)
   do_work(indir, outdir, notes_file, probe_sets)
 
