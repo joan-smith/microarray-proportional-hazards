@@ -250,7 +250,9 @@ def write_file_with_results(input_file_name, requested_data, results, outfile_lo
     i += 1
   if i == len(results):
     print 'Error: no results'
-    exit(1)
+    print 'in file: ', input_file_name
+    print 'Finished.'
+    return
 
 
   time_row = requested_data['time_row_num']
