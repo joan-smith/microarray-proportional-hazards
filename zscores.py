@@ -284,6 +284,7 @@ def do_one_file(input_file, input_data, outdir="."):
       results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names, features))
   except Exception as e:
     print "Something went wrong"
+    print "In file: ", input_file
     print e
     exc_type, exc_value, exc_traceback = sys.exc_info()
     traceback.print_exception(exc_type, exc_value, exc_traceback,
