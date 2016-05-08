@@ -35,6 +35,7 @@ from rpy2.rpy_classic import r as r_old
 import rpy2.robjects.numpy2ri
 from rpy2.robjects import r
 import rpy2.robjects as robjects
+from rpy2.rinterface import RRuntimeError
 rpy2.robjects.numpy2ri.activate()
 
 import help_message
@@ -208,26 +209,29 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
 
   r.assign('gene', expn_value)
   r('data = data.frame(' + data_frame_string + ')')
-  coxuh_output = r('summary( coxph(formula = Surv(time, censor) ~ ' + formula_string + ', ' +
-    'data = data, model=FALSE, x=FALSE, y=FALSE))')
+  try:
+    coxuh_output = r('summary( coxph(formula = Surv(time, censor) ~ ' + formula_string + ', ' +
+      'data = data, model=FALSE, x=FALSE, y=FALSE))')
 
-  coef_ind = list(coxuh_output.names).index('coefficients')
-  coeffs = coxuh_output[coef_ind]
+    coef_ind = list(coxuh_output.names).index('coefficients')
+    coeffs = coxuh_output[coef_ind]
 
-  patient_count_ind = list(coxuh_output.names).index('n')
-  patient_count = coxuh_output[patient_count_ind][0]
+    patient_count_ind = list(coxuh_output.names).index('n')
+    patient_count = coxuh_output[patient_count_ind][0]
 
-  cox_dict = {
-      'name': gene_name,
-      'n': patient_count
-  }
-  for multivariate in coeffs.rownames:
-    cox_dict[multivariate] = {
-      'z': coeffs.rx(multivariate, 'z')[0],
-      'p': coeffs.rx(multivariate, 'Pr(>|z|)')[0]
+    cox_dict = {
+        'name': gene_name,
+        'n': patient_count
     }
+    for multivariate in coeffs.rownames:
+      cox_dict[multivariate] = {
+        'z': coeffs.rx(multivariate, 'z')[0],
+        'p': coeffs.rx(multivariate, 'Pr(>|z|)')[0]
+      }
 
-  return cox_dict
+    return cox_dict
+  except RRuntimeError as e:
+    return {'error': '-1'}
 
 def write_file_with_results(input_file_name, requested_data, results, outfile_location):
   input_file_name_slug = os.path.basename(input_file_name).split('.')[0]
@@ -283,7 +287,9 @@ def do_one_file(input_file, input_data, outdir="."):
   features = input_data['features']
   try:
     for i in range(len(patient_values)):
-      results.append(coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names, features))
+      result = coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names, features)
+      if 'error' not in result.keys():
+        results.append(result)
   except Exception as e:
     print "Something went wrong"
     print "In file: ", input_file
