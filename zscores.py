@@ -84,7 +84,7 @@ def get_time_and_censor(cohort, time_row, censor_row):
     print 'Unsupported Input Error: Time and censor provided must be integers. Row: ' + str(censor_row) + '.'
     print '   ', cohort[censor_row]
     print 'To work around, please use interactive mode and select supported time, censor, and covariates.'
-    exit(1)
+    return None
 
   return survival_time, survival_censor
 
@@ -185,8 +185,8 @@ def coxuh(gene_name, expn_value, surv_time, surv_censor, feature_names, features
   r.assign('censor', surv_censor)
   safe_feature_names = []
   for idx, feature_name in enumerate(feature_names):
-    if 'factor(' in feature_name:
-      match =  re.search('factor\((.*)\): (.*)', feature_name)
+    if 'factor{' in feature_name:
+      match =  re.search('factor{(.*)}: (.*)', feature_name)
       reference = match.group(1)
       factor_feature_name = safe_string(match.group(2))
       feature = features[idx].astype(str)
@@ -244,6 +244,7 @@ def write_file_with_results(input_file_name, requested_data, results, outfile_lo
   # with the gene first.
   multivariates = None
   i = 0
+  print multivariates
   while multivariates == None and i < len(results):
     if len(results[i].keys()) > 0:
       multivariates = results[i].keys()
@@ -270,11 +271,22 @@ def write_file_with_results(input_file_name, requested_data, results, outfile_lo
         outfile.write(result['name'])
         outfile.write(', {:d}'.format(result['n']))
         for m in multivariates:
-          outfile.write(
-            ', {:g}'.format(result[m]['z']) +
-            ', {:g}'.format(result[m]['p'])
-          )
+          try:
+            outfile.write(
+              ', {:g}'.format(result[m]['z']) +
+              ', {:g}'.format(result[m]['p'])
+            )
+          except KeyError as e:
+            print e
+            print output_name
+            print result.keys()
+            outfile.write(
+              ', {:g}'.format(np.nan) +
+              ', {:g}'.format(np.nan)
+            )
+
         outfile.write('\n')
+
   print "Complete!"
 
 def do_one_file(input_file, input_data, outdir="."):
@@ -285,6 +297,7 @@ def do_one_file(input_file, input_data, outdir="."):
   survival_censor = input_data['survival_censor']
   feature_names = input_data['feature_names']
   features = input_data['features']
+  print feature_names
   try:
     for i in range(len(patient_values)):
       result = coxuh(gene_names[i], patient_values[i] , survival_time , survival_censor, feature_names, features)
@@ -358,6 +371,9 @@ def get_options(argv):
   return infile, outdir, multivariates, interactive
 
 def get_row_number_from_title(title, row_titles):
+  if 'factor{' in title:
+    match =  re.search('factor{(.*)}: (.*)', title)
+    title = match.group(2)
   if row_titles.count(title) != 1:
     raise ValueError(title, row_titles)
   return row_titles.index(title)
@@ -393,7 +409,7 @@ def script_run(
   input_data['feature_names'], input_data['features'] = requested_features(
       gene_signature_names,
       gene_signatures,
-      input_data['metadata_feature_names'],
+      metadata_feature_rows,
       input_data['metadata_features'])
 
   do_one_file(input_file_path, input_data, outdir)
@@ -411,7 +427,10 @@ def main(argv=None):
           selections['censor_row_number'],
           features_rows=selections['additional_variables_rows'])
 
-      gene_signature_names, gene_signatures = parse_gene_signatures(input_data['gene_names'], input_data['patient_values'], selections['gene_signature_probe_sets'])
+      gene_signature_names, gene_signatures = parse_gene_signatures(
+          input_data['gene_names'],
+          input_data['patient_values'],
+          selections['gene_signature_probe_sets'])
 
       input_data['feature_names'], input_data['features'] = requested_features(
           gene_signature_names,
